@@ -24,12 +24,17 @@ try {
   console.log('Note: uploads dir not writable, using /tmp');
 }
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
-});
-const upload = multer({ storage });
+// Multer config - use memory storage on Vercel, disk on local
+let upload;
+if (process.env.VERCEL) {
+  upload = multer({ storage: multer.memoryStorage() });
+} else {
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+  });
+  upload = multer({ storage });
+}
 
 // PostgreSQL connection
 const pool = new Pool(
@@ -154,13 +159,16 @@ app.get('/api/products/:id', async (req, res) => {
 app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
     const { name, description, price, category, rating } = req.body;
-    const imageUrl = req.file ? req.file.filename : null;
+    const imageUrl = req.file ? (req.file.filename || req.file.originalname || null) : null;
+    console.log('Adding product:', name, price, category);
     const result = await pool.query(
       'INSERT INTO products (name, description, price, image_url, category, rating) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5]
     );
+    console.log('✅ Product added:', result.rows[0].id);
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error('❌ Add product error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
