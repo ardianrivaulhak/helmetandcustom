@@ -49,13 +49,11 @@ const pool = new Pool(
 pool.query('SELECT NOW()')
   .then(async () => {
     console.log('✅ PostgreSQL connected');
-    // Ensure image_url column is TEXT type (for base64 storage)
     try {
       await pool.query("ALTER TABLE products ALTER COLUMN image_url TYPE TEXT");
+      await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS address TEXT");
       await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_url TEXT");
-    } catch (e) {
-      // ignore if already done
-    }
+    } catch (e) {}
   })
   .catch(err => {
     console.error('❌ PostgreSQL error:', err.message);
@@ -152,7 +150,7 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, category, rating } = req.body;
+    const { name, description, price, category, rating, address } = req.body;
     let imageUrl = null;
     
     // Simpan gambar sebagai base64 data URL di database
@@ -164,8 +162,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
     
     console.log('Adding product:', name, price, category);
     const result = await pool.query(
-      'INSERT INTO products (name, description, price, image_url, category, rating) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5]
+      'INSERT INTO products (name, description, price, image_url, category, rating, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null]
     );
     console.log('✅ Product added:', result.rows[0].id);
     res.status(201).json(result.rows[0]);
@@ -177,7 +175,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
 
 app.put('/api/products/:id', upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, category, rating } = req.body;
+    const { name, description, price, category, rating, address } = req.body;
     const id = req.params.id;
     let result;
     if (req.file) {
@@ -185,13 +183,13 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
       const mimeType = req.file.mimetype || 'image/jpeg';
       const imageUrl = `data:${mimeType};base64,${base64}`;
       result = await pool.query(
-        'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, rating=$6, updated_at=CURRENT_TIMESTAMP WHERE id=$7 RETURNING *',
-        [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, id]
+        'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, rating=$6, address=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING *',
+        [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null, id]
       );
     } else {
       result = await pool.query(
-        'UPDATE products SET name=$1, description=$2, price=$3, category=$4, rating=$5, updated_at=CURRENT_TIMESTAMP WHERE id=$6 RETURNING *',
-        [name, description, parseFloat(price), category, parseFloat(rating) || 4.5, id]
+        'UPDATE products SET name=$1, description=$2, price=$3, category=$4, rating=$5, address=$6, updated_at=CURRENT_TIMESTAMP WHERE id=$7 RETURNING *',
+        [name, description, parseFloat(price), category, parseFloat(rating) || 4.5, address || null, id]
       );
     }
     res.json(result.rows[0]);
@@ -253,18 +251,17 @@ app.get('/api/reviews', async (req, res) => {
   }
 });
 
-app.post('/api/reviews', upload.single('image'), async (req, res) => {
+app.post('/api/reviews', async (req, res) => {
   try {
     const { product_id, user_id, user_name, comment, rating } = req.body;
     if (!comment || !user_name) {
       return res.status(400).json({ error: 'Nama dan komentar wajib' });
     }
-    const imageUrl = req.file ? `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}` : null;
     const uid = (user_id && user_id !== '0' && user_id !== 'null') ? parseInt(user_id) : null;
     const pid = (product_id && product_id !== '0' && product_id !== 'null') ? parseInt(product_id) : null;
     const result = await pool.query(
-      'INSERT INTO reviews (product_id, user_id, user_name, comment, rating, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [pid, uid, user_name, comment, parseInt(rating) || 5, imageUrl]
+      'INSERT INTO reviews (product_id, user_id, user_name, comment, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [pid, uid, user_name, comment, parseInt(rating) || 5]
     );
     console.log('✅ Review added by:', user_name);
     res.status(201).json(result.rows[0]);

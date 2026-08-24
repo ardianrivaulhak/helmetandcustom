@@ -209,6 +209,36 @@ class _DetailScreenState extends State<DetailScreen> {
         const Text('Deskripsi', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(widget.helmet.description, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
+        if (widget.helmet.address != null && widget.helmet.address!.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const Text('Lokasi', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () async {
+              final query = Uri.encodeComponent(widget.helmet.address!);
+              final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C1E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.red, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(widget.helmet.address!, style: const TextStyle(color: Color(0xFF42A5F5), fontSize: 14, decoration: TextDecoration.underline))),
+                  const Icon(Icons.open_in_new, color: Colors.white38, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 32),
         SizedBox(
           width: double.infinity,

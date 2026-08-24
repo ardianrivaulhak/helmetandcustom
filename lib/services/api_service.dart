@@ -36,6 +36,7 @@ class ApiService {
     required double price,
     required String category,
     double rating = 4.5,
+    String? address,
     String? imagePath,
     Uint8List? imageBytes,
     String? imageFileName,
@@ -47,6 +48,7 @@ class ApiService {
       request.fields['price'] = price.toString();
       request.fields['category'] = category;
       request.fields['rating'] = rating.toString();
+      if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
       if (kIsWeb && imageBytes != null && imageFileName != null) {
         request.files.add(http.MultipartFile.fromBytes(
@@ -74,6 +76,7 @@ class ApiService {
     required double price,
     required String category,
     double rating = 4.5,
+    String? address,
     String? imagePath,
     Uint8List? imageBytes,
     String? imageFileName,
@@ -85,6 +88,7 @@ class ApiService {
       request.fields['price'] = price.toString();
       request.fields['category'] = category;
       request.fields['rating'] = rating.toString();
+      if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
       if (kIsWeb && imageBytes != null && imageFileName != null) {
         request.files.add(http.MultipartFile.fromBytes(

@@ -6,6 +6,7 @@ class Helmet {
   final String? imageUrl;
   final String category;
   final double rating;
+  final String? address;
 
   Helmet({
     this.id,
@@ -15,6 +16,7 @@ class Helmet {
     this.imageUrl,
     required this.category,
     required this.rating,
+    this.address,
   });
 
   factory Helmet.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class Helmet {
       imageUrl: json['image_url'],
       category: json['category'] ?? '',
       rating: (json['rating'] ?? 4.5).toDouble(),
+      address: json['address'],
     );
   }
 }

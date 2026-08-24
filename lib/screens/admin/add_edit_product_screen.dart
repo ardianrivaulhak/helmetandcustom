@@ -20,6 +20,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
   final _ratingController = TextEditingController();
+  final _addressController = TextEditingController();
   String _selectedCategory = 'Half-face';
   bool _isLoading = false;
   XFile? _pickedImage;
@@ -38,6 +39,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       _priceController.text = widget.helmet!.price.toStringAsFixed(0);
       _ratingController.text = widget.helmet!.rating.toString();
       _selectedCategory = widget.helmet!.category;
+      if (widget.helmet!.address != null) _addressController.text = widget.helmet!.address!;
     }
   }
 
@@ -67,6 +69,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         price: double.parse(_priceController.text),
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
+        address: _addressController.text,
         imagePath: (!kIsWeb && _pickedImage != null) ? _pickedImage!.path : null,
         imageBytes: (kIsWeb && _pickedImageBytes != null) ? _pickedImageBytes : null,
         imageFileName: _pickedImage?.name,
@@ -78,6 +81,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         price: double.parse(_priceController.text),
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
+        address: _addressController.text,
         imagePath: (!kIsWeb && _pickedImage != null) ? _pickedImage!.path : null,
         imageBytes: (kIsWeb && _pickedImageBytes != null) ? _pickedImageBytes : null,
         imageFileName: _pickedImage?.name,
@@ -217,6 +221,16 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                     controller: _ratingController,
                     hint: 'Contoh: 4.5',
                     keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Alamat
+                  _buildLabel('Alamat (opsional)'),
+                  const SizedBox(height: 8),
+                  _buildTextField(
+                    controller: _addressController,
+                    hint: 'Contoh: Jl. Merdeka No. 10, Bandung',
+                    maxLines: 2,
                   ),
                   const SizedBox(height: 32),
 
@@ -366,6 +380,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     _descController.dispose();
     _priceController.dispose();
     _ratingController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 }

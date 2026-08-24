@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:typed_data';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import '../../services/auth_service.dart';
-import '../../services/api_service.dart';
 
 class ReviewsScreen extends StatefulWidget {
   const ReviewsScreen({super.key});
@@ -64,8 +60,6 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   void _showAddReviewDialog() {
     final commentController = TextEditingController();
     int selectedRating = 5;
-    XFile? pickedImage;
-    Uint8List? imageBytes;
 
     showDialog(
       context: context,
@@ -109,35 +103,6 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text('Foto (opsional):', style: TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () async {
-                        final picker = ImagePicker();
-                        final picked = await picker.pickImage(source: ImageSource.gallery);
-                        if (picked != null) {
-                          final bytes = await picked.readAsBytes();
-                          setDialogState(() { pickedImage = picked; imageBytes = bytes; });
-                        }
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(minHeight: 100, maxHeight: 200),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1C1C1E),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: imageBytes != null
-                            ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(imageBytes!, fit: BoxFit.contain, width: double.infinity))
-                            : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Icon(Icons.add_photo_alternate, size: 36, color: Colors.white38),
-                                SizedBox(height: 4),
-                                Text('Tap untuk pilih foto', style: TextStyle(color: Colors.white38, fontSize: 12)),
-                              ]),
-                      ),
-                    ),
                     const SizedBox(height: 24),
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                       TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(color: Colors.white54))),
@@ -145,7 +110,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                       ElevatedButton(
                         onPressed: () async {
                           if (commentController.text.trim().isEmpty) return;
-                          await _submitReview(commentController.text.trim(), selectedRating, pickedImage, imageBytes);
+                          await _submitReview(commentController.text.trim(), selectedRating);
                           if (ctx.mounted) Navigator.pop(ctx);
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)),
@@ -162,21 +127,18 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     );
   }
 
-  Future<void> _submitReview(String comment, int rating, XFile? image, Uint8List? imageBytes) async {
+  Future<void> _submitReview(String comment, int rating) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('https://helmetandcustom.vercel.app/api/reviews'));
-      request.fields['user_id'] = (AuthService.userId ?? 0).toString();
-      request.fields['user_name'] = AuthService.userName;
-      request.fields['comment'] = comment;
-      request.fields['rating'] = rating.toString();
-
-      if (kIsWeb && imageBytes != null && image != null) {
-        request.files.add(http.MultipartFile.fromBytes('image', imageBytes, filename: image.name));
-      } else if (!kIsWeb && image != null) {
-        request.files.add(await http.MultipartFile.fromPath('image', image.path));
-      }
-
-      final response = await request.send();
+      final response = await http.post(
+        Uri.parse('https://helmetandcustom.vercel.app/api/reviews'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': AuthService.userId,
+          'user_name': AuthService.userName,
+          'comment': comment,
+          'rating': rating,
+        }),
+      );
       if (response.statusCode == 201) {
         _loadReviews(page: 1);
         if (mounted) {
@@ -278,55 +240,12 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     final String comment = review['comment'] ?? '';
     final String? productName = review['product_name'];
     final String date = review['created_at'] ?? '';
-    final String? imageUrl = review['image_url'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: const Color(0xFF2A2A2D), borderRadius: BorderRadius.circular(16)),
-      child: isWide && imageUrl != null && imageUrl.isNotEmpty
-          // Desktop: foto di samping
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Foto
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    ApiService.getImageUrl(imageUrl),
-                    width: 180,
-                    height: 140,
-                    fit: BoxFit.cover,
-                    errorBuilder: (c, e, s) => const SizedBox(),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Content
-                Expanded(child: _buildReviewContent(name, date, rating, productName, comment)),
-              ],
-            )
-          // Mobile: foto di bawah
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildReviewContent(name, date, rating, productName, comment),
-                if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 250),
-                      child: Image.network(
-                        ApiService.getImageUrl(imageUrl),
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                        errorBuilder: (c, e, s) => const SizedBox(),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+      child: _buildReviewContent(name, date, rating, productName, comment),
     );
   }
 
