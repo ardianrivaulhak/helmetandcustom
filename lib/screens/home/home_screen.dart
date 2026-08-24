@@ -66,15 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF5E6D3), Color(0xFFE8D5B7)],
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: const Color(0xFF1C1C1E),
+      body: SafeArea(
           child: Column(
             children: [
               // Header
@@ -198,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
