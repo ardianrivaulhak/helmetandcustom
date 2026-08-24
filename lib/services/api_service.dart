@@ -119,6 +119,7 @@ class ApiService {
   static String getImageUrl(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) return '';
     if (imageUrl.startsWith('http')) return imageUrl;
+    if (imageUrl.startsWith('data:')) return imageUrl;
     return 'https://helmetandcustom.vercel.app/uploads/$imageUrl';
   }
 }

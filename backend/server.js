@@ -159,7 +159,15 @@ app.get('/api/products/:id', async (req, res) => {
 app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
     const { name, description, price, category, rating } = req.body;
-    const imageUrl = req.file ? (req.file.filename || req.file.originalname || null) : null;
+    let imageUrl = null;
+    
+    // Simpan gambar sebagai base64 data URL di database
+    if (req.file) {
+      const base64 = req.file.buffer.toString('base64');
+      const mimeType = req.file.mimetype || 'image/jpeg';
+      imageUrl = `data:${mimeType};base64,${base64}`;
+    }
+    
     console.log('Adding product:', name, price, category);
     const result = await pool.query(
       'INSERT INTO products (name, description, price, image_url, category, rating) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -179,9 +187,12 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const id = req.params.id;
     let result;
     if (req.file) {
+      const base64 = req.file.buffer.toString('base64');
+      const mimeType = req.file.mimetype || 'image/jpeg';
+      const imageUrl = `data:${mimeType};base64,${base64}`;
       result = await pool.query(
         'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, rating=$6, updated_at=CURRENT_TIMESTAMP WHERE id=$7 RETURNING *',
-        [name, description, parseFloat(price), req.file.filename, category, parseFloat(rating) || 4.5, id]
+        [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, id]
       );
     } else {
       result = await pool.query(
@@ -254,7 +265,7 @@ app.post('/api/reviews', upload.single('image'), async (req, res) => {
     if (!comment || !user_name) {
       return res.status(400).json({ error: 'Nama dan komentar wajib' });
     }
-    const imageUrl = req.file ? req.file.filename : null;
+    const imageUrl = req.file ? `data:${req.file.mimetype || 'image/jpeg'};base64,${req.file.buffer.toString('base64')}` : null;
     const uid = (user_id && user_id !== '0' && user_id !== 'null') ? parseInt(user_id) : null;
     const pid = (product_id && product_id !== '0' && product_id !== 'null') ? parseInt(product_id) : null;
     const result = await pool.query(
