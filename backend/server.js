@@ -171,19 +171,40 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/products', upload.single('image'), async (req, res) => {
+app.post('/api/products', upload.array('images', 3), async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     let imageUrl = null;
     
-    // Simpan gambar sebagai base64 data URL di database
-    if (req.file) {
-      const base64 = req.file.buffer.toString('base64');
-      const mimeType = req.file.mimetype || 'image/jpeg';
-      imageUrl = `data:${mimeType};base64,${base64}`;
+    // Upload images to Cloudinary (max 3)
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        try {
+          const url = await uploadToCloudinary(file.buffer, file.mimetype);
+          imageUrls.push(url);
+        } catch (uploadErr) {
+          console.error('Cloudinary upload error:', uploadErr.message);
+        }
+      }
+    }
+
+    // Fallback: single file upload (field name 'image')
+    if (imageUrls.length === 0 && req.file) {
+      try {
+        const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+        imageUrls.push(url);
+      } catch (uploadErr) {
+        console.error('Cloudinary single upload error:', uploadErr.message);
+      }
+    }
+
+    // Store as JSON array or single URL for backward compatibility
+    if (imageUrls.length > 0) {
+      imageUrl = JSON.stringify(imageUrls);
     }
     
-    console.log('Adding product:', name, price, category);
+    console.log('Adding product:', name, price, category, '| Images:', imageUrls.length);
     const result = await pool.query(
       'INSERT INTO products (name, description, price, image_url, category, rating, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null]
@@ -196,15 +217,27 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+app.put('/api/products/:id', upload.array('images', 3), async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     const id = req.params.id;
+    
+    // Upload images to Cloudinary (max 3)
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        try {
+          const url = await uploadToCloudinary(file.buffer, file.mimetype);
+          imageUrls.push(url);
+        } catch (uploadErr) {
+          console.error('Cloudinary upload error:', uploadErr.message);
+        }
+      }
+    }
+
     let result;
-    if (req.file) {
-      const base64 = req.file.buffer.toString('base64');
-      const mimeType = req.file.mimetype || 'image/jpeg';
-      const imageUrl = `data:${mimeType};base64,${base64}`;
+    if (imageUrls.length > 0) {
+      const imageUrl = JSON.stringify(imageUrls);
       result = await pool.query(
         'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, rating=$6, address=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING *',
         [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null, id]

@@ -17,14 +17,43 @@ class ProductImage extends StatelessWidget {
     this.height,
   });
 
+  /// Parse image_url which can be:
+  /// - null/empty
+  /// - a single URL string
+  /// - a base64 data URL
+  /// - a JSON array of URLs: '["url1","url2","url3"]'
+  static List<String> parseImageUrls(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return [];
+    final url = ApiService.getImageUrl(imageUrl);
+    if (url.isEmpty) return [];
+
+    // Try parsing as JSON array
+    if (url.startsWith('[') || imageUrl.startsWith('[')) {
+      try {
+        final raw = imageUrl.startsWith('[') ? imageUrl : url;
+        final parsed = json.decode(raw);
+        if (parsed is List) {
+          return parsed.cast<String>();
+        }
+      } catch (_) {}
+    }
+
+    return [url];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final url = ApiService.getImageUrl(imageUrl);
-    
-    if (url.isEmpty) {
+    final urls = parseImageUrls(imageUrl);
+
+    if (urls.isEmpty) {
       return _placeholder();
     }
 
+    // Show first image for card/thumbnail usage
+    return _buildImage(urls.first);
+  }
+
+  Widget _buildImage(String url) {
     // Base64 image
     if (url.startsWith('data:')) {
       try {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../models/coffee.dart';
-import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/product_image.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -18,11 +17,20 @@ class DetailScreen extends StatefulWidget {
 class _DetailScreenState extends State<DetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
+  int _currentImageIndex = 0;
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _loadLikeStatus();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLikeStatus() async {
@@ -74,7 +82,7 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = ApiService.getImageUrl(widget.helmet.imageUrl);
+    final imageUrls = ProductImage.parseImageUrls(widget.helmet.imageUrl);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 800;
 
@@ -84,15 +92,74 @@ class _DetailScreenState extends State<DetailScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 900),
-            child: isDesktop ? _buildDesktopLayout(imageUrl) : _buildMobileLayout(imageUrl),
+            child: isDesktop ? _buildDesktopLayout(imageUrls) : _buildMobileLayout(imageUrls),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildImageCarousel(List<String> imageUrls, {double? height}) {
+    if (imageUrls.isEmpty) {
+      return Container(
+        height: height ?? 300,
+        color: const Color(0xFF3A3A3D),
+        child: const Center(child: Icon(Icons.sports_motorsports, size: 80, color: Colors.white38)),
+      );
+    }
+
+    if (imageUrls.length == 1) {
+      return ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity, height: height);
+    }
+
+    return Stack(
+      children: [
+        SizedBox(
+          height: height ?? 300,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: imageUrls.length,
+            onPageChanged: (index) => setState(() => _currentImageIndex = index),
+            itemBuilder: (context, index) {
+              final url = imageUrls[index];
+              return Image.network(
+                url,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (c, e, s) => Container(
+                  color: const Color(0xFF3A3A3D),
+                  child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.white38)),
+                ),
+              );
+            },
+          ),
+        ),
+        // Dot indicators
+        Positioned(
+          bottom: 12,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(imageUrls.length, (index) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: _currentImageIndex == index ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _currentImageIndex == index ? const Color(0xFF1565C0) : Colors.white54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
   // Desktop: gambar di kiri, detail di kanan
-  Widget _buildDesktopLayout(String imageUrl) {
+  Widget _buildDesktopLayout(List<String> imageUrls) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -103,7 +170,7 @@ class _DetailScreenState extends State<DetailScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity, height: double.infinity),
+                child: _buildImageCarousel(imageUrls, height: double.infinity),
               ),
               _buildTopButtons(),
             ],
@@ -123,16 +190,16 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   // Mobile: gambar di atas, detail di bawah
-  Widget _buildMobileLayout(String imageUrl) {
+  Widget _buildMobileLayout(List<String> imageUrls) {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Image
+          // Image carousel
           Stack(
             children: [
               AspectRatio(
                 aspectRatio: 4 / 3,
-                child: ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity),
+                child: _buildImageCarousel(imageUrls),
               ),
               _buildTopButtons(),
             ],
@@ -254,7 +321,4 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _imagePlaceholder() {
-    return Container(color: const Color(0xFF3A3A3D), child: const Center(child: Icon(Icons.sports_motorsports, size: 80, color: Colors.white38)));
-  }
 }

@@ -23,8 +23,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _addressController = TextEditingController();
   String _selectedCategory = 'Half-face';
   bool _isLoading = false;
-  XFile? _pickedImage;
-  Uint8List? _pickedImageBytes;
+
+  // Multiple images support (max 3)
+  List<XFile> _pickedImages = [];
+  List<Uint8List> _pickedImagesBytes = [];
 
   final List<String> _categories = ['Half-face', 'Open-face', 'Full-face'];
 
@@ -43,16 +45,64 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickSingleImage() async {
+    if (_pickedImages.length >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
     if (picked != null) {
       final bytes = await picked.readAsBytes();
       setState(() {
-        _pickedImage = picked;
-        _pickedImageBytes = bytes;
+        _pickedImages.add(picked);
+        _pickedImagesBytes.add(bytes);
       });
     }
+  }
+
+  Future<void> _pickMultipleImages() async {
+    final remaining = 3 - _pickedImages.length;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    final picker = ImagePicker();
+    try {
+      final picked = await picker.pickMultiImage(
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (picked.isNotEmpty) {
+        final toAdd = picked.take(remaining).toList();
+        for (final img in toAdd) {
+          final bytes = await img.readAsBytes();
+          _pickedImages.add(img);
+          _pickedImagesBytes.add(bytes);
+        }
+        setState(() {});
+      }
+    } catch (e) {
+      // Fallback to single pick
+      await _pickSingleImage();
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _pickedImages.removeAt(index);
+      _pickedImagesBytes.removeAt(index);
+    });
   }
 
   Future<void> _saveProduct() async {
@@ -70,9 +120,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
         address: _addressController.text,
-        imagePath: (!kIsWeb && _pickedImage != null) ? _pickedImage!.path : null,
-        imageBytes: (kIsWeb && _pickedImageBytes != null) ? _pickedImageBytes : null,
-        imageFileName: _pickedImage?.name,
+        imageBytesList: kIsWeb && _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
+        imageFileNames: _pickedImages.isNotEmpty ? _pickedImages.map((e) => e.name).toList() : null,
       );
     } else {
       success = await ApiService.addProduct(
@@ -82,9 +131,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
         address: _addressController.text,
-        imagePath: (!kIsWeb && _pickedImage != null) ? _pickedImage!.path : null,
-        imageBytes: (kIsWeb && _pickedImageBytes != null) ? _pickedImageBytes : null,
-        imageFileName: _pickedImage?.name,
+        imageBytesList: kIsWeb && _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
+        imageFileNames: _pickedImages.isNotEmpty ? _pickedImages.map((e) => e.name).toList() : null,
       );
     }
 
@@ -127,31 +175,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image Picker - responsive
-                  _buildLabel('Foto Produk'),
+                  // Image Picker - multiple (max 3)
+                  _buildLabel('Foto Produk (max 3)'),
                   const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final width = constraints.maxWidth;
-                        final height = width * 0.6; // aspect ratio 5:3
-                        return Container(
-                          width: double.infinity,
-                          height: height,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2D),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: _buildImagePreview(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  _buildMultiImagePicker(),
                   const SizedBox(height: 20),
 
                   // Nama
@@ -267,72 +294,138 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     );
   }
 
-  Widget _buildImagePreview() {
-    // Gambar baru dipilih
-    if (_pickedImageBytes != null) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(
-            _pickedImageBytes!,
-            fit: BoxFit.contain,
-            width: double.infinity,
-          ),
-          _buildChangeLabel(),
-        ],
-      );
-    }
-
-    // Gambar lama dari server (edit mode)
-    if (_isEditing && widget.helmet!.imageUrl != null) {
-      final url = ApiService.getImageUrl(widget.helmet!.imageUrl);
-      if (url.isNotEmpty) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              url,
-              fit: BoxFit.contain,
-              errorBuilder: (ctx, err, st) => _buildPlaceholder(),
+  Widget _buildMultiImagePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Show picked images
+        if (_pickedImagesBytes.isNotEmpty)
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _pickedImagesBytes.length,
+              itemBuilder: (context, index) {
+                return Stack(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white24),
+                        image: DecorationImage(
+                          image: MemoryImage(_pickedImagesBytes[index]),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 16,
+                      child: GestureDetector(
+                        onTap: () => _removeImage(index),
+                        child: Container(
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
-            _buildChangeLabel(),
+          ),
+
+        // Show existing images (edit mode) when no new images picked
+        if (_pickedImagesBytes.isEmpty && _isEditing && widget.helmet!.imageUrl != null)
+          _buildExistingImages(),
+
+        const SizedBox(height: 12),
+
+        // Counter
+        Text(
+          '${_pickedImagesBytes.length}/3 foto dipilih',
+          style: const TextStyle(color: Colors.white54, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+
+        // Buttons
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _pickedImages.length < 3 ? _pickSingleImage : null,
+              icon: const Icon(Icons.add_photo_alternate, color: Colors.white70),
+              label: const Text('Tambah Foto', style: TextStyle(color: Colors.white70)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.white24),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_pickedImages.length < 3)
+              OutlinedButton.icon(
+                onPressed: _pickMultipleImages,
+                icon: const Icon(Icons.photo_library, color: Colors.white70, size: 18),
+                label: const Text('Pilih Banyak', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
           ],
-        );
-      }
-    }
-
-    return _buildPlaceholder();
-  }
-
-  Widget _buildChangeLabel() {
-    return Positioned(
-      bottom: 8,
-      right: 8,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.black54,
-          borderRadius: BorderRadius.circular(8),
         ),
-        child: const Text(
-          'Tap untuk ganti',
-          style: TextStyle(color: Colors.white, fontSize: 12),
-        ),
-      ),
+      ],
     );
   }
 
-  Widget _buildPlaceholder() {
-    return const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.add_photo_alternate, size: 50, color: Colors.white38),
-        SizedBox(height: 8),
-        Text(
-          'Tap untuk pilih foto',
-          style: TextStyle(color: Colors.white38, fontSize: 14),
-        ),
-      ],
+  Widget _buildExistingImages() {
+    final url = ApiService.getImageUrl(widget.helmet!.imageUrl);
+    if (url.isEmpty) return const SizedBox.shrink();
+
+    // Check if it's a JSON array of URLs
+    List<String> urls = [];
+    try {
+      if (url.startsWith('[')) {
+        final parsed = List<String>.from(
+          (url.startsWith('[') ? List<dynamic>.from(Uri.decodeFull(url) as dynamic) : [url]) as Iterable,
+        );
+        urls = parsed;
+      }
+    } catch (_) {}
+
+    if (urls.isEmpty) {
+      // Single image or old format
+      urls = [url];
+    }
+
+    return SizedBox(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: urls.length,
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.only(right: 12),
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                urls[index],
+                fit: BoxFit.cover,
+                errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, color: Colors.white38),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

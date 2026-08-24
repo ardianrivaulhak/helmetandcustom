@@ -40,6 +40,8 @@ class ApiService {
     String? imagePath,
     Uint8List? imageBytes,
     String? imageFileName,
+    List<Uint8List>? imageBytesList,
+    List<String>? imageFileNames,
   }) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/products'));
@@ -50,14 +52,27 @@ class ApiService {
       request.fields['rating'] = rating.toString();
       if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
-      if (kIsWeb && imageBytes != null && imageFileName != null) {
+      // Multiple images (new)
+      if (kIsWeb && imageBytesList != null && imageBytesList.isNotEmpty) {
+        for (int i = 0; i < imageBytesList.length; i++) {
+          final fileName = (imageFileNames != null && i < imageFileNames.length)
+              ? imageFileNames[i]
+              : 'photo_$i.jpg';
+          request.files.add(http.MultipartFile.fromBytes(
+            'images',
+            imageBytesList[i],
+            filename: fileName,
+          ));
+        }
+      } else if (kIsWeb && imageBytes != null && imageFileName != null) {
+        // Single image fallback
         request.files.add(http.MultipartFile.fromBytes(
-          'image',
+          'images',
           imageBytes,
           filename: imageFileName,
         ));
       } else if (imagePath != null && imagePath.isNotEmpty) {
-        request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+        request.files.add(await http.MultipartFile.fromPath('images', imagePath));
       }
 
       final response = await request.send();
@@ -80,6 +95,8 @@ class ApiService {
     String? imagePath,
     Uint8List? imageBytes,
     String? imageFileName,
+    List<Uint8List>? imageBytesList,
+    List<String>? imageFileNames,
   }) async {
     try {
       var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl/products/$id'));
@@ -90,14 +107,26 @@ class ApiService {
       request.fields['rating'] = rating.toString();
       if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
-      if (kIsWeb && imageBytes != null && imageFileName != null) {
+      // Multiple images (new)
+      if (kIsWeb && imageBytesList != null && imageBytesList.isNotEmpty) {
+        for (int i = 0; i < imageBytesList.length; i++) {
+          final fileName = (imageFileNames != null && i < imageFileNames.length)
+              ? imageFileNames[i]
+              : 'photo_$i.jpg';
+          request.files.add(http.MultipartFile.fromBytes(
+            'images',
+            imageBytesList[i],
+            filename: fileName,
+          ));
+        }
+      } else if (kIsWeb && imageBytes != null && imageFileName != null) {
         request.files.add(http.MultipartFile.fromBytes(
-          'image',
+          'images',
           imageBytes,
           filename: imageFileName,
         ));
       } else if (imagePath != null && imagePath.isNotEmpty) {
-        request.files.add(await http.MultipartFile.fromPath('image', imagePath));
+        request.files.add(await http.MultipartFile.fromPath('images', imagePath));
       }
 
       final response = await request.send();
