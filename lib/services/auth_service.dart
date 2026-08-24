@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:html' as html;
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000/api/auth';
+  static const String baseUrl = 'https://helmetandcustom.vercel.app/api/auth';
   static const int _sessionDurationMinutes = 5;
 
   static bool get isLoggedIn {

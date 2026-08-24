@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/coffee.dart';
 
 class ApiService {
-  // Ganti dengan IP server kamu jika beda
-  static const String baseUrl = 'http://localhost:3000/api';
+  // API URL - production
+  static const String baseUrl = 'https://helmetandcustom.vercel.app/api';
 
   // GET semua produk (dengan pagination)
   static Future<Map<String, dynamic>> getProducts({int page = 1, int limit = 8}) async {
@@ -119,6 +119,6 @@ class ApiService {
   static String getImageUrl(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) return '';
     if (imageUrl.startsWith('http')) return imageUrl;
-    return 'http://localhost:3000/uploads/$imageUrl';
+    return 'https://helmetandcustom.vercel.app/uploads/$imageUrl';
   }
 }

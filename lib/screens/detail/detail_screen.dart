@@ -27,12 +27,12 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _loadLikeStatus() async {
     if (widget.helmet.id == null) return;
     try {
-      final countRes = await http.get(Uri.parse('http://localhost:3000/api/likes/product/${widget.helmet.id}'));
+      final countRes = await http.get(Uri.parse('https://helmetandcustom.vercel.app/api/likes/product/${widget.helmet.id}'));
       if (countRes.statusCode == 200) {
         setState(() => _likeCount = json.decode(countRes.body)['total'] ?? 0);
       }
       if (AuthService.userId != null) {
-        final checkRes = await http.get(Uri.parse('http://localhost:3000/api/likes/check/${widget.helmet.id}/${AuthService.userId}'));
+        final checkRes = await http.get(Uri.parse('https://helmetandcustom.vercel.app/api/likes/check/${widget.helmet.id}/${AuthService.userId}'));
         if (checkRes.statusCode == 200) {
           setState(() => _isLiked = json.decode(checkRes.body)['liked'] ?? false);
         }
@@ -44,7 +44,7 @@ class _DetailScreenState extends State<DetailScreen> {
     if (!AuthService.isLoggedIn || AuthService.userId == null) return;
     try {
       final res = await http.post(
-        Uri.parse('http://localhost:3000/api/likes/toggle'),
+        Uri.parse('https://helmetandcustom.vercel.app/api/likes/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'product_id': widget.helmet.id, 'user_id': AuthService.userId}),
       );

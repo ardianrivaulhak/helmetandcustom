@@ -29,7 +29,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   Future<void> _loadReviews({int page = 1}) async {
     setState(() => _isLoading = true);
     try {
-      final response = await http.get(Uri.parse('http://localhost:3000/api/reviews?page=$page&limit=5'));
+      final response = await http.get(Uri.parse('https://helmetandcustom.vercel.app/api/reviews?page=$page&limit=5'));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         
@@ -164,7 +164,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
 
   Future<void> _submitReview(String comment, int rating, XFile? image, Uint8List? imageBytes) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('http://localhost:3000/api/reviews'));
+      var request = http.MultipartRequest('POST', Uri.parse('https://helmetandcustom.vercel.app/api/reviews'));
       request.fields['user_id'] = (AuthService.userId ?? 0).toString();
       request.fields['user_name'] = AuthService.userName;
       request.fields['comment'] = comment;
