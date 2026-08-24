@@ -24,17 +24,8 @@ try {
   console.log('Note: uploads dir not writable, using /tmp');
 }
 
-// Multer config - use memory storage on Vercel, disk on local
-let upload;
-if (process.env.VERCEL) {
-  upload = multer({ storage: multer.memoryStorage() });
-} else {
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
-  });
-  upload = multer({ storage });
-}
+// Multer config - always use memory storage for Vercel compatibility
+const upload = multer({ storage: multer.memoryStorage() });
 
 // PostgreSQL connection
 const pool = new Pool(
@@ -55,16 +46,16 @@ const pool = new Pool(
 pool.query('SELECT NOW()')
   .then(async () => {
     console.log('✅ PostgreSQL connected');
-    // Ensure image_url column exists in reviews
+    // Ensure image_url column is TEXT type (for base64 storage)
     try {
-      await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)");
+      await pool.query("ALTER TABLE products ALTER COLUMN image_url TYPE TEXT");
+      await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_url TEXT");
     } catch (e) {
-      // column already exists, ignore
+      // ignore if already done
     }
   })
   .catch(err => {
     console.error('❌ PostgreSQL error:', err.message);
-    console.error('   Jalankan "npm run init-db" terlebih dahulu');
   });
 
 // ============ AUTH ============
