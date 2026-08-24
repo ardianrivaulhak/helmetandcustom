@@ -5,9 +5,31 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'wxzdj6mq',
+  api_key: process.env.CLOUDINARY_API_KEY || '464315981431265',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'Ipya301iKPadjeg5x97QIAFoDrECLO',
+});
+
+// Helper: upload buffer to Cloudinary
+function uploadToCloudinary(buffer, mimetype) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'coffeshop_reviews', resource_type: 'image' },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
+}
 
 // Middleware
 app.use(cors());
@@ -53,6 +75,7 @@ pool.query('SELECT NOW()')
       await pool.query("ALTER TABLE products ALTER COLUMN image_url TYPE TEXT");
       await pool.query("ALTER TABLE products ADD COLUMN IF NOT EXISTS address TEXT");
       await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_url TEXT");
+      await pool.query("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS image_urls TEXT");
     } catch (e) {}
   })
   .catch(err => {
@@ -251,7 +274,7 @@ app.get('/api/reviews', async (req, res) => {
   }
 });
 
-app.post('/api/reviews', async (req, res) => {
+app.post('/api/reviews', upload.array('images', 3), async (req, res) => {
   try {
     const { product_id, user_id, user_name, comment, rating } = req.body;
     if (!comment || !user_name) {
@@ -259,11 +282,27 @@ app.post('/api/reviews', async (req, res) => {
     }
     const uid = (user_id && user_id !== '0' && user_id !== 'null') ? parseInt(user_id) : null;
     const pid = (product_id && product_id !== '0' && product_id !== 'null') ? parseInt(product_id) : null;
+
+    // Upload images to Cloudinary (max 3)
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        try {
+          const url = await uploadToCloudinary(file.buffer, file.mimetype);
+          imageUrls.push(url);
+        } catch (uploadErr) {
+          console.error('Cloudinary upload error:', uploadErr.message);
+        }
+      }
+    }
+
+    const imageUrlsJson = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null;
+
     const result = await pool.query(
-      'INSERT INTO reviews (product_id, user_id, user_name, comment, rating) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [pid, uid, user_name, comment, parseInt(rating) || 5]
+      'INSERT INTO reviews (product_id, user_id, user_name, comment, rating, image_urls) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [pid, uid, user_name, comment, parseInt(rating) || 5, imageUrlsJson]
     );
-    console.log('✅ Review added by:', user_name);
+    console.log('✅ Review added by:', user_name, '| Images:', imageUrls.length);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Review error:', error.message);

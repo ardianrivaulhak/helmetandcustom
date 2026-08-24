@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../../services/auth_service.dart';
 
 class ReviewsScreen extends StatefulWidget {
@@ -28,11 +30,9 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       final response = await http.get(Uri.parse('https://helmetandcustom.vercel.app/api/reviews?page=$page&limit=5'));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        
-        // Handle both paginated and non-paginated response
+
         List<dynamic> reviewList;
         if (decoded is List) {
-          // Old format: array langsung
           reviewList = decoded;
           setState(() {
             _reviews = reviewList.cast<Map<String, dynamic>>();
@@ -40,7 +40,6 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             _totalPages = 1;
           });
         } else {
-          // New format: {data: [...], page, totalPages}
           reviewList = decoded['data'] ?? [];
           setState(() {
             _reviews = reviewList.cast<Map<String, dynamic>>();
@@ -60,11 +59,38 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   void _showAddReviewDialog() {
     final commentController = TextEditingController();
     int selectedRating = 5;
+    List<XFile> selectedImages = [];
+    List<Uint8List> imageBytes = [];
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
+          Future<void> pickImages() async {
+            final picker = ImagePicker();
+            final remaining = 3 - selectedImages.length;
+            if (remaining <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.orange),
+              );
+              return;
+            }
+            final picked = await picker.pickMultiImage(
+              maxWidth: 1024,
+              maxHeight: 1024,
+              imageQuality: 80,
+            );
+            if (picked.isNotEmpty) {
+              final toAdd = picked.take(remaining).toList();
+              for (final img in toAdd) {
+                final bytes = await img.readAsBytes();
+                selectedImages.add(img);
+                imageBytes.add(bytes);
+              }
+              setDialogState(() {});
+            }
+          }
+
           return Dialog(
             backgroundColor: const Color(0xFF2A2A2D),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -103,6 +129,70 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    // Image picker section
+                    Row(
+                      children: [
+                        const Text('Foto (max 3):', style: TextStyle(color: Colors.white70)),
+                        const Spacer(),
+                        Text('${selectedImages.length}/3', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Preview selected images
+                    if (imageBytes.isNotEmpty)
+                      SizedBox(
+                        height: 90,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: imageBytes.length,
+                          itemBuilder: (context, index) {
+                            return Stack(
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    image: DecorationImage(
+                                      image: MemoryImage(imageBytes[index]),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 2,
+                                  right: 10,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        selectedImages.removeAt(index);
+                                        imageBytes.removeAt(index);
+                                      });
+                                    },
+                                    child: Container(
+                                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                      padding: const EdgeInsets.all(4),
+                                      child: const Icon(Icons.close, color: Colors.white, size: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: selectedImages.length < 3 ? pickImages : null,
+                      icon: const Icon(Icons.add_photo_alternate, color: Colors.white70),
+                      label: const Text('Pilih Foto', style: TextStyle(color: Colors.white70)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white24),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: [
                       TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal', style: TextStyle(color: Colors.white54))),
@@ -110,7 +200,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                       ElevatedButton(
                         onPressed: () async {
                           if (commentController.text.trim().isEmpty) return;
-                          await _submitReview(commentController.text.trim(), selectedRating);
+                          await _submitReview(commentController.text.trim(), selectedRating, selectedImages);
                           if (ctx.mounted) Navigator.pop(ctx);
                         },
                         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)),
@@ -127,25 +217,44 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     );
   }
 
-  Future<void> _submitReview(String comment, int rating) async {
+  Future<void> _submitReview(String comment, int rating, List<XFile> images) async {
     try {
-      final response = await http.post(
-        Uri.parse('https://helmetandcustom.vercel.app/api/reviews'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'user_id': AuthService.userId,
-          'user_name': AuthService.userName,
-          'comment': comment,
-          'rating': rating,
-        }),
-      );
+      // Use multipart request to send images
+      final uri = Uri.parse('https://helmetandcustom.vercel.app/api/reviews');
+      final request = http.MultipartRequest('POST', uri);
+
+      request.fields['user_id'] = AuthService.userId?.toString() ?? '';
+      request.fields['user_name'] = AuthService.userName;
+      request.fields['comment'] = comment;
+      request.fields['rating'] = rating.toString();
+
+      // Attach images (max 3)
+      for (final img in images) {
+        final bytes = await img.readAsBytes();
+        final filename = img.name.isNotEmpty ? img.name : 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        request.files.add(http.MultipartFile.fromBytes(
+          'images',
+          bytes,
+          filename: filename,
+        ));
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
       if (response.statusCode == 201) {
         _loadReviews(page: 1);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review berhasil ditambahkan!'), backgroundColor: Colors.green));
         }
+      } else {
+        print('Submit review error: ${response.statusCode} ${response.body}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal menambah review'), backgroundColor: Colors.red));
+        }
       }
     } catch (e) {
+      print('Submit review exception: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal menambah review'), backgroundColor: Colors.red));
       }
@@ -241,15 +350,26 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     final String? productName = review['product_name'];
     final String date = review['created_at'] ?? '';
 
+    // Parse image_urls (stored as JSON string)
+    List<String> imageUrls = [];
+    if (review['image_urls'] != null && review['image_urls'].toString().isNotEmpty) {
+      try {
+        final parsed = json.decode(review['image_urls']);
+        if (parsed is List) {
+          imageUrls = parsed.cast<String>();
+        }
+      } catch (_) {}
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: const Color(0xFF2A2A2D), borderRadius: BorderRadius.circular(16)),
-      child: _buildReviewContent(name, date, rating, productName, comment),
+      child: _buildReviewContent(name, date, rating, productName, comment, imageUrls),
     );
   }
 
-  Widget _buildReviewContent(String name, String date, int rating, String? productName, String comment) {
+  Widget _buildReviewContent(String name, String date, int rating, String? productName, String comment, List<String> imageUrls) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -276,7 +396,77 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         ],
         const SizedBox(height: 8),
         Text(comment, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4)),
+        // Display review images
+        if (imageUrls.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: imageUrls.length,
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onTap: () => _showFullImage(context, imageUrls, index),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      image: DecorationImage(
+                        image: NetworkImage(imageUrls[index]),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  void _showFullImage(BuildContext context, List<String> imageUrls, int initialIndex) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.black87,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: PageController(initialPage: initialIndex),
+                itemCount: imageUrls.length,
+                itemBuilder: (context, index) {
+                  return InteractiveViewer(
+                    child: Center(
+                      child: Image.network(
+                        imageUrls[index],
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(child: CircularProgressIndicator(color: Colors.white));
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
