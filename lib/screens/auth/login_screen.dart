@@ -48,9 +48,10 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background1.jpg'),
-            fit: BoxFit.cover,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D1117), Color(0xFF1C1C1E)],
           ),
         ),
         child: SafeArea(
@@ -72,12 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
+                        color: const Color(0xFF1565C0),
                         borderRadius: BorderRadius.circular(20),
-                        image: const DecorationImage(
-                          image: AssetImage('assets/images/background2.jpg'),
-                          fit: BoxFit.cover,
-                        ),
                       ),
+                      child: const Icon(Icons.sports_motorsports, size: 60, color: Colors.white),
                     ),
                     const SizedBox(height: 24),
                     const Text('Helmet Store & Custom', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),

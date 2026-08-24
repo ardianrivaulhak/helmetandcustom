@@ -25,7 +25,10 @@ try {
 }
 
 // Multer config - always use memory storage for Vercel compatibility
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 } // max 2MB
+});
 
 // PostgreSQL connection
 const pool = new Pool(
