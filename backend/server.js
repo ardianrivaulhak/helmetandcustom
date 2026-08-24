@@ -313,9 +313,13 @@ app.post('/api/likes/toggle', async (req, res) => {
   }
 });
 
-// Start
-app.listen(PORT, () => {
-  console.log(`🚀 Server: http://localhost:${PORT}`);
-  console.log(`📦 Products: http://localhost:${PORT}/api/products`);
-  console.log(`🔐 Auth: POST http://localhost:${PORT}/api/auth/login`);
-});
+// Start (local) or export (Vercel)
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server: http://localhost:${PORT}`);
+    console.log(`📦 Products: http://localhost:${PORT}/api/products`);
+    console.log(`🔐 Auth: POST http://localhost:${PORT}/api/auth/login`);
+  });
+}
