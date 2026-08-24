@@ -122,4 +122,9 @@ class ApiService {
     if (imageUrl.startsWith('data:')) return imageUrl;
     return 'https://helmetandcustom.vercel.app/uploads/$imageUrl';
   }
+
+  // Check if image is base64
+  static bool isBase64Image(String? url) {
+    return url != null && url.startsWith('data:');
+  }
 }

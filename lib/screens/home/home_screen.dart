@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/coffee.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/product_image.dart';
 import '../detail/detail_screen.dart';
 import '../reviews/reviews_screen.dart';
 import '../admin/add_edit_product_screen.dart';
@@ -213,7 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHelmetCard(Helmet helmet) {
-    final imageUrl = ApiService.getImageUrl(helmet.imageUrl);
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => DetailScreen(helmet: helmet))),
       child: Container(
@@ -228,9 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    imageUrl.isNotEmpty
-                        ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: const Color(0xFF3A3A3D), child: const Icon(Icons.sports_motorsports, size: 50, color: Colors.white38)))
-                        : Container(color: const Color(0xFF3A3A3D), child: const Icon(Icons.sports_motorsports, size: 50, color: Colors.white38)),
+                    ProductImage(imageUrl: helmet.imageUrl, fit: BoxFit.cover),
                     Positioned(
                       top: 8, right: 8,
                       child: Container(

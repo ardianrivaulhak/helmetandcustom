@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../models/coffee.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/product_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -102,10 +103,7 @@ class _DetailScreenState extends State<DetailScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => _imagePlaceholder())
-                    : _imagePlaceholder(),
+                child: ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity, height: double.infinity),
               ),
               _buildTopButtons(),
             ],
@@ -134,10 +132,7 @@ class _DetailScreenState extends State<DetailScreen> {
             children: [
               AspectRatio(
                 aspectRatio: 4 / 3,
-                child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, width: double.infinity, fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => _imagePlaceholder())
-                    : _imagePlaceholder(),
+                child: ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity),
               ),
               _buildTopButtons(),
             ],
