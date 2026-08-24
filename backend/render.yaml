@@ -1,0 +1,36 @@
+databases:
+  - name: helmetstoreandcustom-db
+    plan: free
+    databaseName: helmet_store
+    user: helmet_user
+
+services:
+  - type: web
+    plan: free
+    name: helmetstoreandcustom
+    runtime: node
+    buildCommand: npm install && npm run init-db
+    startCommand: npm start
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: helmetstoreandcustom-db
+          property: host
+      - key: DB_USER
+        fromDatabase:
+          name: helmetstoreandcustom-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: helmetstoreandcustom-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: helmetstoreandcustom-db
+          property: database
+      - key: DB_PORT
+        fromDatabase:
+          name: helmetstoreandcustom-db
+          property: port
+      - key: PORT
+        value: 3000

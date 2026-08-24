@@ -1,0 +1,4 @@
+node_modules/
+.env
+uploads/
+helmet_store.db
