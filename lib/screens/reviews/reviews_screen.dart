@@ -66,29 +66,80 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
+          bool isPickingImage = false;
+
           Future<void> pickImages() async {
+            if (isPickingImage) return;
+            isPickingImage = true;
             final picker = ImagePicker();
             final remaining = 3 - selectedImages.length;
             if (remaining <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.orange),
               );
+              isPickingImage = false;
               return;
             }
-            final picked = await picker.pickMultiImage(
+
+            try {
+              // Coba pickMultiImage dulu
+              final picked = await picker.pickMultiImage(
+                maxWidth: 1024,
+                maxHeight: 1024,
+                imageQuality: 80,
+              );
+              if (picked.isNotEmpty) {
+                final toAdd = picked.take(remaining).toList();
+                for (final img in toAdd) {
+                  final bytes = await img.readAsBytes();
+                  selectedImages.add(img);
+                  imageBytes.add(bytes);
+                }
+                setDialogState(() {});
+              }
+            } catch (e) {
+              // Fallback: pilih satu-satu
+              final img = await picker.pickImage(
+                source: ImageSource.gallery,
+                maxWidth: 1024,
+                maxHeight: 1024,
+                imageQuality: 80,
+              );
+              if (img != null) {
+                final bytes = await img.readAsBytes();
+                selectedImages.add(img);
+                imageBytes.add(bytes);
+                setDialogState(() {});
+              }
+            }
+            isPickingImage = false;
+          }
+
+          Future<void> pickSingleImage() async {
+            if (isPickingImage) return;
+            isPickingImage = true;
+            final remaining = 3 - selectedImages.length;
+            if (remaining <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.orange),
+              );
+              isPickingImage = false;
+              return;
+            }
+            final picker = ImagePicker();
+            final img = await picker.pickImage(
+              source: ImageSource.gallery,
               maxWidth: 1024,
               maxHeight: 1024,
               imageQuality: 80,
             );
-            if (picked.isNotEmpty) {
-              final toAdd = picked.take(remaining).toList();
-              for (final img in toAdd) {
-                final bytes = await img.readAsBytes();
-                selectedImages.add(img);
-                imageBytes.add(bytes);
-              }
+            if (img != null) {
+              final bytes = await img.readAsBytes();
+              selectedImages.add(img);
+              imageBytes.add(bytes);
               setDialogState(() {});
             }
+            isPickingImage = false;
           }
 
           return Dialog(
@@ -184,14 +235,29 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                         ),
                       ),
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: selectedImages.length < 3 ? pickImages : null,
-                      icon: const Icon(Icons.add_photo_alternate, color: Colors.white70),
-                      label: const Text('Pilih Foto', style: TextStyle(color: Colors.white70)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: selectedImages.length < 3 ? pickSingleImage : null,
+                          icon: const Icon(Icons.add_photo_alternate, color: Colors.white70),
+                          label: const Text('Tambah Foto', style: TextStyle(color: Colors.white70)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white24),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (selectedImages.length < 3)
+                          OutlinedButton.icon(
+                            onPressed: pickImages,
+                            icon: const Icon(Icons.photo_library, color: Colors.white70, size: 18),
+                            label: const Text('Pilih Banyak', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: [
