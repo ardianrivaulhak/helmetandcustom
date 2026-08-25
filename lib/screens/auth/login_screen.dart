@@ -73,10 +73,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Icon(Icons.sports_motorsports, size: 60, color: Colors.white),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/background2.jpg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => Container(
+                            color: const Color(0xFF1565C0),
+                            child: const Icon(Icons.sports_motorsports, size: 60, color: Colors.white),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     const Text('Helmet Store & Custom', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
