@@ -33,7 +33,15 @@ function uploadToCloudinary(buffer, mimetype) {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// IMPORTANT: Only parse JSON for non-multipart requests
+// express.json() can interfere with multer on multipart/form-data
+app.use((req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    return next(); // Skip JSON parsing for multipart
+  }
+  express.json()(req, res, next);
+});
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Buat folder uploads (hanya di local, skip di Vercel)
@@ -66,8 +74,9 @@ const uploadSingle = (req, res, next) => {
 const uploadMultiple = (req, res, next) => {
   upload.array('images', 3)(req, res, (err) => {
     if (err) {
-      console.log('Multer error (ignored):', err.message);
+      console.log('Multer error:', err.message, err.code);
     }
+    console.log('Multer processed - files:', req.files ? req.files.length : 0, '| file:', req.file ? 'yes' : 'no');
     next();
   });
 };
@@ -196,15 +205,20 @@ app.post('/api/products', uploadMultiple, async (req, res) => {
     const { name, description, price, category, rating, address } = req.body;
     let imageUrl = null;
     
+    console.log('POST /api/products - body fields:', Object.keys(req.body));
+    console.log('POST /api/products - files count:', req.files ? req.files.length : 0);
+    
     // Upload images to Cloudinary (max 3)
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
+        console.log('Uploading to Cloudinary:', file.originalname, file.size, 'bytes');
         try {
           const url = await uploadToCloudinary(file.buffer, file.mimetype);
           imageUrls.push(url);
+          console.log('✅ Cloudinary upload success:', url.substring(0, 60));
         } catch (uploadErr) {
-          console.error('Cloudinary upload error:', uploadErr.message);
+          console.error('❌ Cloudinary upload error:', uploadErr.message);
         }
       }
     }
@@ -219,7 +233,7 @@ app.post('/api/products', uploadMultiple, async (req, res) => {
       }
     }
 
-    // Store as JSON array or single URL for backward compatibility
+    // Store as JSON array
     if (imageUrls.length > 0) {
       imageUrl = JSON.stringify(imageUrls);
     }
@@ -229,7 +243,7 @@ app.post('/api/products', uploadMultiple, async (req, res) => {
       'INSERT INTO products (name, description, price, image_url, category, rating, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null]
     );
-    console.log('✅ Product added:', result.rows[0].id);
+    console.log('✅ Product added:', result.rows[0].id, '| image_url:', result.rows[0].image_url ? 'SET' : 'NULL');
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('❌ Add product error:', error.message);

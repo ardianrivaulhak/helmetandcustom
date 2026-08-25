@@ -120,8 +120,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
         address: _addressController.text,
-        imageBytesList: kIsWeb && _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
+        imageBytesList: _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
         imageFileNames: _pickedImages.isNotEmpty ? _pickedImages.map((e) => e.name).toList() : null,
+        imagePath: (!kIsWeb && _pickedImages.isNotEmpty) ? _pickedImages.first.path : null,
       );
     } else {
       success = await ApiService.addProduct(
@@ -131,8 +132,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         category: _selectedCategory,
         rating: double.tryParse(_ratingController.text) ?? 4.5,
         address: _addressController.text,
-        imageBytesList: kIsWeb && _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
+        imageBytesList: _pickedImagesBytes.isNotEmpty ? _pickedImagesBytes : null,
         imageFileNames: _pickedImages.isNotEmpty ? _pickedImages.map((e) => e.name).toList() : null,
+        imagePath: (!kIsWeb && _pickedImages.isNotEmpty) ? _pickedImages.first.path : null,
       );
     }
 

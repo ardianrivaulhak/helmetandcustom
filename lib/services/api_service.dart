@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/coffee.dart';
 
 class ApiService {
@@ -52,8 +51,8 @@ class ApiService {
       request.fields['rating'] = rating.toString();
       if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
-      // Multiple images (new)
-      if (kIsWeb && imageBytesList != null && imageBytesList.isNotEmpty) {
+      // Multiple images
+      if (imageBytesList != null && imageBytesList.isNotEmpty) {
         for (int i = 0; i < imageBytesList.length; i++) {
           final fileName = (imageFileNames != null && i < imageFileNames.length)
               ? imageFileNames[i]
@@ -64,8 +63,8 @@ class ApiService {
             filename: fileName,
           ));
         }
-      } else if (kIsWeb && imageBytes != null && imageFileName != null) {
-        // Single image fallback
+      } else if (imageBytes != null && imageFileName != null) {
+        // Single image fallback (bytes)
         request.files.add(http.MultipartFile.fromBytes(
           'images',
           imageBytes,
@@ -107,8 +106,8 @@ class ApiService {
       request.fields['rating'] = rating.toString();
       if (address != null && address.isNotEmpty) request.fields['address'] = address;
 
-      // Multiple images (new)
-      if (kIsWeb && imageBytesList != null && imageBytesList.isNotEmpty) {
+      // Multiple images
+      if (imageBytesList != null && imageBytesList.isNotEmpty) {
         for (int i = 0; i < imageBytesList.length; i++) {
           final fileName = (imageFileNames != null && i < imageFileNames.length)
               ? imageFileNames[i]
@@ -119,7 +118,7 @@ class ApiService {
             filename: fileName,
           ));
         }
-      } else if (kIsWeb && imageBytes != null && imageFileName != null) {
+      } else if (imageBytes != null && imageFileName != null) {
         request.files.add(http.MultipartFile.fromBytes(
           'images',
           imageBytes,
