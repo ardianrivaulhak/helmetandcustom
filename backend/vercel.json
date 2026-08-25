@@ -3,24 +3,10 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "10mb"
-      }
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
+      "use": "@vercel/node"
     }
   ],
   "routes": [
-    {
-      "src": "/uploads/(.*)",
-      "dest": "/public/uploads/$1",
-      "headers": {
-        "Access-Control-Allow-Origin": "*"
-      }
-    },
     {
       "src": "/api/(.*)",
       "dest": "server.js",

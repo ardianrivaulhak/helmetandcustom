@@ -43,38 +43,32 @@ class ApiService {
     List<String>? imageFileNames,
   }) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/products'));
-      request.fields['name'] = name;
-      request.fields['description'] = description;
-      request.fields['price'] = price.toString();
-      request.fields['category'] = category;
-      request.fields['rating'] = rating.toString();
-      if (address != null && address.isNotEmpty) request.fields['address'] = address;
-
-      // Multiple images
+      // Convert images to base64 and send as JSON
+      List<String> base64Images = [];
+      
       if (imageBytesList != null && imageBytesList.isNotEmpty) {
-        for (int i = 0; i < imageBytesList.length; i++) {
-          final fileName = (imageFileNames != null && i < imageFileNames.length)
-              ? imageFileNames[i]
-              : 'photo_$i.jpg';
-          request.files.add(http.MultipartFile.fromBytes(
-            'images',
-            imageBytesList[i],
-            filename: fileName,
-          ));
+        for (final bytes in imageBytesList) {
+          base64Images.add(base64Encode(bytes));
         }
-      } else if (imageBytes != null && imageFileName != null) {
-        // Single image fallback (bytes)
-        request.files.add(http.MultipartFile.fromBytes(
-          'images',
-          imageBytes,
-          filename: imageFileName,
-        ));
-      } else if (imagePath != null && imagePath.isNotEmpty) {
-        request.files.add(await http.MultipartFile.fromPath('images', imagePath));
+      } else if (imageBytes != null) {
+        base64Images.add(base64Encode(imageBytes));
       }
 
-      final response = await request.send();
+      final body = {
+        'name': name,
+        'description': description,
+        'price': price,
+        'category': category,
+        'rating': rating,
+        'address': address ?? '',
+        'images_base64': base64Images,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/products'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(body),
+      );
       return response.statusCode == 201;
     } catch (e) {
       print('Error adding product: $e');
@@ -98,37 +92,32 @@ class ApiService {
     List<String>? imageFileNames,
   }) async {
     try {
-      var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl/products/$id'));
-      request.fields['name'] = name;
-      request.fields['description'] = description;
-      request.fields['price'] = price.toString();
-      request.fields['category'] = category;
-      request.fields['rating'] = rating.toString();
-      if (address != null && address.isNotEmpty) request.fields['address'] = address;
-
-      // Multiple images
+      // Convert images to base64 and send as JSON
+      List<String> base64Images = [];
+      
       if (imageBytesList != null && imageBytesList.isNotEmpty) {
-        for (int i = 0; i < imageBytesList.length; i++) {
-          final fileName = (imageFileNames != null && i < imageFileNames.length)
-              ? imageFileNames[i]
-              : 'photo_$i.jpg';
-          request.files.add(http.MultipartFile.fromBytes(
-            'images',
-            imageBytesList[i],
-            filename: fileName,
-          ));
+        for (final bytes in imageBytesList) {
+          base64Images.add(base64Encode(bytes));
         }
-      } else if (imageBytes != null && imageFileName != null) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'images',
-          imageBytes,
-          filename: imageFileName,
-        ));
-      } else if (imagePath != null && imagePath.isNotEmpty) {
-        request.files.add(await http.MultipartFile.fromPath('images', imagePath));
+      } else if (imageBytes != null) {
+        base64Images.add(base64Encode(imageBytes));
       }
 
-      final response = await request.send();
+      final body = {
+        'name': name,
+        'description': description,
+        'price': price,
+        'category': category,
+        'rating': rating,
+        'address': address ?? '',
+        'images_base64': base64Images,
+      };
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/products/$id'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(body),
+      );
       return response.statusCode == 200;
     } catch (e) {
       print('Error updating product: $e');

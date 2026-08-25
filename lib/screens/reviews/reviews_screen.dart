@@ -285,28 +285,26 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
 
   Future<void> _submitReview(String comment, int rating, List<XFile> images) async {
     try {
-      // Use multipart request to send images
-      final uri = Uri.parse('https://helmetandcustom.vercel.app/api/reviews');
-      final request = http.MultipartRequest('POST', uri);
-
-      request.fields['user_id'] = AuthService.userId?.toString() ?? '';
-      request.fields['user_name'] = AuthService.userName;
-      request.fields['comment'] = comment;
-      request.fields['rating'] = rating.toString();
-
-      // Attach images (max 3)
+      // Convert images to base64
+      List<String> base64Images = [];
       for (final img in images) {
         final bytes = await img.readAsBytes();
-        final filename = img.name.isNotEmpty ? img.name : 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        request.files.add(http.MultipartFile.fromBytes(
-          'images',
-          bytes,
-          filename: filename,
-        ));
+        base64Images.add(base64Encode(bytes));
       }
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final body = {
+        'user_id': AuthService.userId?.toString() ?? '',
+        'user_name': AuthService.userName,
+        'comment': comment,
+        'rating': rating,
+        'images_base64': base64Images,
+      };
+
+      final response = await http.post(
+        Uri.parse('https://helmetandcustom.vercel.app/api/reviews'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(body),
+      );
 
       if (response.statusCode == 201) {
         _loadReviews(page: 1);
@@ -471,6 +469,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
               scrollDirection: Axis.horizontal,
               itemCount: imageUrls.length,
               itemBuilder: (context, index) {
+                final imgUrl = imageUrls[index];
                 return GestureDetector(
                   onTap: () => _showFullImage(context, imageUrls, index),
                   child: Container(
@@ -479,10 +478,20 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                     height: 100,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      image: DecorationImage(
-                        image: NetworkImage(imageUrls[index]),
-                        fit: BoxFit.cover,
-                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: imgUrl.startsWith('data:')
+                          ? Image.memory(
+                              base64Decode(imgUrl.split(',').last),
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.white38),
+                            )
+                          : Image.network(
+                              imgUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => const Icon(Icons.broken_image, color: Colors.white38),
+                            ),
                     ),
                   ),
                 );
@@ -507,16 +516,22 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 controller: PageController(initialPage: initialIndex),
                 itemCount: imageUrls.length,
                 itemBuilder: (context, index) {
+                  final imgUrl = imageUrls[index];
                   return InteractiveViewer(
                     child: Center(
-                      child: Image.network(
-                        imageUrls[index],
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return const Center(child: CircularProgressIndicator(color: Colors.white));
-                        },
-                      ),
+                      child: imgUrl.startsWith('data:')
+                          ? Image.memory(
+                              base64Decode(imgUrl.split(',').last),
+                              fit: BoxFit.contain,
+                            )
+                          : Image.network(
+                              imgUrl,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const Center(child: CircularProgressIndicator(color: Colors.white));
+                              },
+                            ),
                     ),
                   );
                 },

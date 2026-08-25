@@ -2,84 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cloudinary config
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'wxzdj6mq',
-  api_key: process.env.CLOUDINARY_API_KEY || '464315981431265',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'Ipya301iKPadjeg5x97QIAFoDrECLO',
-});
-
-// Helper: upload buffer to Cloudinary
-function uploadToCloudinary(buffer, mimetype) {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'coffeshop_reviews', resource_type: 'image' },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result.secure_url);
-      }
-    );
-    stream.end(buffer);
-  });
-}
-
 // Middleware
 app.use(cors());
-// IMPORTANT: Only parse JSON for non-multipart requests
-// express.json() can interfere with multer on multipart/form-data
-app.use((req, res, next) => {
-  const contentType = req.headers['content-type'] || '';
-  if (contentType.includes('multipart/form-data')) {
-    return next(); // Skip JSON parsing for multipart
-  }
-  express.json()(req, res, next);
-});
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Buat folder uploads (hanya di local, skip di Vercel)
-const uploadsDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
-try {
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-} catch (e) {
-  console.log('Note: uploads dir not writable, using /tmp');
-}
-
-// Multer config - always use memory storage for Vercel compatibility
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 } // max 2MB
-});
-
-// Wrapper to handle multer errors gracefully (single file, field name 'image')
-const uploadSingle = (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
-    if (err) {
-      console.log('Multer error (ignored):', err.message);
-    }
-    next();
-  });
-};
-
-// Wrapper for multiple images upload (field name 'images', max 3)
-const uploadMultiple = (req, res, next) => {
-  upload.array('images', 3)(req, res, (err) => {
-    if (err) {
-      console.log('Multer error:', err.message, err.code);
-    }
-    console.log('Multer processed - files:', req.files ? req.files.length : 0, '| file:', req.file ? 'yes' : 'no');
-    next();
-  });
-};
+app.use(express.json({ limit: '10mb' }));
 
 // PostgreSQL connection
 const pool = new Pool(
@@ -200,50 +129,24 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/products', uploadMultiple, async (req, res) => {
+app.post('/api/products', async (req, res) => {
   try {
-    const { name, description, price, category, rating, address } = req.body;
+    const { name, description, price, category, rating, address, images_base64 } = req.body;
     let imageUrl = null;
-    
-    console.log('POST /api/products - body fields:', Object.keys(req.body));
-    console.log('POST /api/products - files count:', req.files ? req.files.length : 0);
-    
-    // Upload images to Cloudinary (max 3)
-    let imageUrls = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        console.log('Uploading to Cloudinary:', file.originalname, file.size, 'bytes');
-        try {
-          const url = await uploadToCloudinary(file.buffer, file.mimetype);
-          imageUrls.push(url);
-          console.log('✅ Cloudinary upload success:', url.substring(0, 60));
-        } catch (uploadErr) {
-          console.error('❌ Cloudinary upload error:', uploadErr.message);
-        }
-      }
+
+    // Store base64 images as data URLs in JSON array
+    if (images_base64 && Array.isArray(images_base64) && images_base64.length > 0) {
+      const dataUrls = images_base64.map(b64 => `data:image/jpeg;base64,${b64}`);
+      imageUrl = JSON.stringify(dataUrls);
+      console.log('Product images:', dataUrls.length, 'base64 images received');
     }
 
-    // Fallback: single file upload (field name 'image')
-    if (imageUrls.length === 0 && req.file) {
-      try {
-        const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
-        imageUrls.push(url);
-      } catch (uploadErr) {
-        console.error('Cloudinary single upload error:', uploadErr.message);
-      }
-    }
-
-    // Store as JSON array
-    if (imageUrls.length > 0) {
-      imageUrl = JSON.stringify(imageUrls);
-    }
-    
-    console.log('Adding product:', name, price, category, '| Images:', imageUrls.length);
+    console.log('Adding product:', name, price, category);
     const result = await pool.query(
       'INSERT INTO products (name, description, price, image_url, category, rating, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null]
     );
-    console.log('✅ Product added:', result.rows[0].id, '| image_url:', result.rows[0].image_url ? 'SET' : 'NULL');
+    console.log('✅ Product added:', result.rows[0].id);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('❌ Add product error:', error.message);
@@ -251,37 +154,15 @@ app.post('/api/products', uploadMultiple, async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', uploadMultiple, async (req, res) => {
+app.put('/api/products/:id', async (req, res) => {
   try {
-    const { name, description, price, category, rating, address } = req.body;
+    const { name, description, price, category, rating, address, images_base64 } = req.body;
     const id = req.params.id;
-    
-    // Upload images to Cloudinary (max 3)
-    let imageUrls = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        try {
-          const url = await uploadToCloudinary(file.buffer, file.mimetype);
-          imageUrls.push(url);
-        } catch (uploadErr) {
-          console.error('Cloudinary upload error:', uploadErr.message);
-        }
-      }
-    }
-
-    // Fallback: single file upload (field name 'image')
-    if (imageUrls.length === 0 && req.file) {
-      try {
-        const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
-        imageUrls.push(url);
-      } catch (uploadErr) {
-        console.error('Cloudinary single upload error:', uploadErr.message);
-      }
-    }
 
     let result;
-    if (imageUrls.length > 0) {
-      const imageUrl = JSON.stringify(imageUrls);
+    if (images_base64 && Array.isArray(images_base64) && images_base64.length > 0) {
+      const dataUrls = images_base64.map(b64 => `data:image/jpeg;base64,${b64}`);
+      const imageUrl = JSON.stringify(dataUrls);
       result = await pool.query(
         'UPDATE products SET name=$1, description=$2, price=$3, image_url=$4, category=$5, rating=$6, address=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8 RETURNING *',
         [name, description, parseFloat(price), imageUrl, category, parseFloat(rating) || 4.5, address || null, id]
@@ -319,25 +200,13 @@ app.get('/api/reviews', async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / limit);
 
-    let result;
-    try {
-      result = await pool.query(`
-        SELECT r.*, p.name as product_name 
-        FROM reviews r LEFT JOIN products p ON r.product_id = p.id 
-        ORDER BY r.created_at DESC
-        LIMIT $1 OFFSET $2
-      `, [limit, offset]);
-    } catch (queryErr) {
-      // Fallback without image_url if column doesn't exist
-      result = await pool.query(`
-        SELECT r.id, r.product_id, r.user_id, r.user_name, r.comment, r.rating, r.created_at, p.name as product_name 
-        FROM reviews r LEFT JOIN products p ON r.product_id = p.id 
-        ORDER BY r.created_at DESC
-        LIMIT $1 OFFSET $2
-      `, [limit, offset]);
-    }
+    const result = await pool.query(`
+      SELECT r.*, p.name as product_name 
+      FROM reviews r LEFT JOIN products p ON r.product_id = p.id 
+      ORDER BY r.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
 
-    console.log(`📋 Reviews: page ${page}, total ${total}, returned ${result.rows.length}`);
     res.json({
       data: result.rows,
       page,
@@ -351,35 +220,26 @@ app.get('/api/reviews', async (req, res) => {
   }
 });
 
-app.post('/api/reviews', upload.array('images', 3), async (req, res) => {
+app.post('/api/reviews', async (req, res) => {
   try {
-    const { product_id, user_id, user_name, comment, rating } = req.body;
+    const { product_id, user_id, user_name, comment, rating, images_base64 } = req.body;
     if (!comment || !user_name) {
       return res.status(400).json({ error: 'Nama dan komentar wajib' });
     }
     const uid = (user_id && user_id !== '0' && user_id !== 'null') ? parseInt(user_id) : null;
     const pid = (product_id && product_id !== '0' && product_id !== 'null') ? parseInt(product_id) : null;
 
-    // Upload images to Cloudinary (max 3)
-    let imageUrls = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        try {
-          const url = await uploadToCloudinary(file.buffer, file.mimetype);
-          imageUrls.push(url);
-        } catch (uploadErr) {
-          console.error('Cloudinary upload error:', uploadErr.message);
-        }
-      }
+    let imageUrlsJson = null;
+    if (images_base64 && Array.isArray(images_base64) && images_base64.length > 0) {
+      const dataUrls = images_base64.map(b64 => `data:image/jpeg;base64,${b64}`);
+      imageUrlsJson = JSON.stringify(dataUrls);
     }
-
-    const imageUrlsJson = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null;
 
     const result = await pool.query(
       'INSERT INTO reviews (product_id, user_id, user_name, comment, rating, image_urls) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [pid, uid, user_name, comment, parseInt(rating) || 5, imageUrlsJson]
     );
-    console.log('✅ Review added by:', user_name, '| Images:', imageUrls.length);
+    console.log('✅ Review added by:', user_name);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Review error:', error.message);
