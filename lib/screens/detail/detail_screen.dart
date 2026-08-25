@@ -20,11 +20,15 @@ class _DetailScreenState extends State<DetailScreen> {
   int _likeCount = 0;
   int _currentImageIndex = 0;
   late PageController _pageController;
+  List<String> _imageUrls = [];
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    // Show thumbnail from list immediately
+    _imageUrls = ProductImage.parseImageUrls(widget.helmet.imageUrl);
+    _loadFullProduct();
     _loadLikeStatus();
   }
 
@@ -32,6 +36,26 @@ class _DetailScreenState extends State<DetailScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  /// Fetch full product detail (with all images) from API
+  Future<void> _loadFullProduct() async {
+    if (widget.helmet.id == null) return;
+    try {
+      final res = await http.get(Uri.parse('https://helmetandcustom.vercel.app/api/products/${widget.helmet.id}'));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final fullImageUrl = data['image_url'] as String?;
+        final urls = ProductImage.parseImageUrls(fullImageUrl);
+        if (urls.isNotEmpty) {
+          setState(() {
+            _imageUrls = urls;
+          });
+        }
+      }
+    } catch (e) {
+      // Fallback to what we already have
+    }
   }
 
   Future<void> _loadLikeStatus() async {
@@ -83,7 +107,6 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrls = ProductImage.parseImageUrls(widget.helmet.imageUrl);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 800;
 
@@ -93,7 +116,7 @@ class _DetailScreenState extends State<DetailScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 900),
-            child: isDesktop ? _buildDesktopLayout(imageUrls) : _buildMobileLayout(imageUrls),
+            child: isDesktop ? _buildDesktopLayout(_imageUrls) : _buildMobileLayout(_imageUrls),
           ),
         ),
       ),

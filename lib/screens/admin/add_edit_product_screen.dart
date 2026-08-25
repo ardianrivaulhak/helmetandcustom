@@ -57,9 +57,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 80,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 60,
     );
     if (picked != null) {
       final bytes = await picked.readAsBytes();
@@ -81,9 +81,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     final picker = ImagePicker();
     try {
       final picked = await picker.pickMultiImage(
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 60,
       );
       if (picked.isNotEmpty) {
         final toAdd = picked.take(remaining).toList();

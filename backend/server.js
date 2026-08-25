@@ -107,8 +107,22 @@ app.get('/api/products', async (req, res) => {
       [limit, offset]
     );
 
+    // For list view, only send the first image to reduce response size
+    const data = result.rows.map(row => {
+      if (row.image_url) {
+        try {
+          const images = JSON.parse(row.image_url);
+          if (Array.isArray(images) && images.length > 0) {
+            // Only send first image for thumbnail
+            row.image_url = JSON.stringify([images[0]]);
+          }
+        } catch (e) {}
+      }
+      return row;
+    });
+
     res.json({
-      data: result.rows,
+      data,
       page,
       limit,
       total,
