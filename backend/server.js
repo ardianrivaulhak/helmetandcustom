@@ -52,6 +52,17 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 } // max 2MB
 });
 
+// Wrapper to handle multer errors gracefully
+const uploadSingle = (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.log('Multer error (ignored):', err.message);
+      // Continue without file if multer error
+    }
+    next();
+  });
+};
+
 // PostgreSQL connection
 const pool = new Pool(
   process.env.DATABASE_URL
@@ -171,7 +182,7 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/products', upload.array('images', 3), async (req, res) => {
+app.post('/api/products', uploadSingle, async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     let imageUrl = null;
@@ -217,7 +228,7 @@ app.post('/api/products', upload.array('images', 3), async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', upload.array('images', 3), async (req, res) => {
+app.put('/api/products/:id', uploadSingle, async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     const id = req.params.id;
