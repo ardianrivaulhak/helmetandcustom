@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../models/coffee.dart';
 import '../../services/auth_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../../widgets/product_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -98,7 +99,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final message = 'Halo, saya ingin memesan:\n'
         '🪖 ${helmet.name}\n'
         '📏 Ukuran: Allsize\n'
-        '💰 Harga: Rp ${helmet.price.toStringAsFixed(0)}\n\n'
+        '💰 Harga: ${formatCurrency(helmet.price)}\n\n'
         'Apakah stok masih tersedia?';
     final uri = Uri.parse('https://wa.me/6281997635073?text=${Uri.encodeComponent(message)}');
     if (await canLaunchUrl(uri)) {
@@ -360,7 +361,7 @@ class _DetailScreenState extends State<DetailScreen> {
         const SizedBox(height: 4),
         Text(widget.helmet.category, style: const TextStyle(color: Colors.white54, fontSize: 14)),
         const SizedBox(height: 12),
-        Text('Rp ${widget.helmet.price.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF1565C0), fontSize: 26, fontWeight: FontWeight.bold)),
+        Text(formatCurrency(widget.helmet.price), style: const TextStyle(color: Color(0xFF1565C0), fontSize: 26, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         Row(children: [
           const Icon(Icons.star, color: Colors.amber, size: 20),

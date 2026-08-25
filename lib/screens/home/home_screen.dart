@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/coffee.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../../widgets/product_image.dart';
 import '../detail/detail_screen.dart';
 import '../reviews/reviews_screen.dart';
@@ -265,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 4),
                     Expanded(child: Text(helmet.description, style: const TextStyle(color: Colors.white54, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis)),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Flexible(child: Text('Rp ${helmet.price.toStringAsFixed(0)}', style: const TextStyle(color: Color(0xFF1565C0), fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                      Flexible(child: Text(formatCurrency(helmet.price), style: const TextStyle(color: Color(0xFF1565C0), fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                       Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: const Color(0xFF25D366), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.chat, color: Colors.white, size: 18)),
                     ]),
                   ],
