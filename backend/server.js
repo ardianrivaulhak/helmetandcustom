@@ -52,12 +52,21 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 } // max 2MB
 });
 
-// Wrapper to handle multer errors gracefully
+// Wrapper to handle multer errors gracefully (single file, field name 'image')
 const uploadSingle = (req, res, next) => {
   upload.single('image')(req, res, (err) => {
     if (err) {
       console.log('Multer error (ignored):', err.message);
-      // Continue without file if multer error
+    }
+    next();
+  });
+};
+
+// Wrapper for multiple images upload (field name 'images', max 3)
+const uploadMultiple = (req, res, next) => {
+  upload.array('images', 3)(req, res, (err) => {
+    if (err) {
+      console.log('Multer error (ignored):', err.message);
     }
     next();
   });
@@ -182,7 +191,7 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/products', uploadSingle, async (req, res) => {
+app.post('/api/products', uploadMultiple, async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     let imageUrl = null;
@@ -228,7 +237,7 @@ app.post('/api/products', uploadSingle, async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', uploadSingle, async (req, res) => {
+app.put('/api/products/:id', uploadMultiple, async (req, res) => {
   try {
     const { name, description, price, category, rating, address } = req.body;
     const id = req.params.id;
@@ -243,6 +252,16 @@ app.put('/api/products/:id', uploadSingle, async (req, res) => {
         } catch (uploadErr) {
           console.error('Cloudinary upload error:', uploadErr.message);
         }
+      }
+    }
+
+    // Fallback: single file upload (field name 'image')
+    if (imageUrls.length === 0 && req.file) {
+      try {
+        const url = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+        imageUrls.push(url);
+      } catch (uploadErr) {
+        console.error('Cloudinary single upload error:', uploadErr.message);
       }
     }
 
