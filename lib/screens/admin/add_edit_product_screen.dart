@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import '../../models/coffee.dart';
 import '../../services/api_service.dart';
+import '../../widgets/product_image.dart';
 
 class AddEditProductScreen extends StatefulWidget {
   final Helmet? helmet;
@@ -384,24 +386,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   }
 
   Widget _buildExistingImages() {
-    final url = ApiService.getImageUrl(widget.helmet!.imageUrl);
-    if (url.isEmpty) return const SizedBox.shrink();
-
-    // Check if it's a JSON array of URLs
-    List<String> urls = [];
-    try {
-      if (url.startsWith('[')) {
-        final parsed = List<String>.from(
-          (url.startsWith('[') ? List<dynamic>.from(Uri.decodeFull(url) as dynamic) : [url]) as Iterable,
-        );
-        urls = parsed;
-      }
-    } catch (_) {}
-
-    if (urls.isEmpty) {
-      // Single image or old format
-      urls = [url];
-    }
+    final urls = ProductImage.parseImageUrls(widget.helmet!.imageUrl);
+    if (urls.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
       height: 120,
@@ -409,6 +395,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         scrollDirection: Axis.horizontal,
         itemCount: urls.length,
         itemBuilder: (context, index) {
+          final imgUrl = urls[index];
           return Container(
             margin: const EdgeInsets.only(right: 12),
             width: 120,
@@ -419,11 +406,17 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                urls[index],
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, color: Colors.white38),
-              ),
+              child: imgUrl.startsWith('data:')
+                  ? Image.memory(
+                      base64Decode(imgUrl.split(',').last),
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, color: Colors.white38),
+                    )
+                  : Image.network(
+                      imgUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, color: Colors.white38),
+                    ),
             ),
           );
         },

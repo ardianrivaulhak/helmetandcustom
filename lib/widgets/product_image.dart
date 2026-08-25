@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
 
 class ProductImage extends StatelessWidget {
   final String? imageUrl;
@@ -19,26 +18,33 @@ class ProductImage extends StatelessWidget {
 
   /// Parse image_url which can be:
   /// - null/empty
-  /// - a single URL string
-  /// - a base64 data URL
-  /// - a JSON array of URLs: '["url1","url2","url3"]'
+  /// - a single URL string (http...)
+  /// - a base64 data URL (data:image/...)
+  /// - a JSON array: '["data:image/jpeg;base64,...","data:image/jpeg;base64,..."]'
   static List<String> parseImageUrls(String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) return [];
-    final url = ApiService.getImageUrl(imageUrl);
-    if (url.isEmpty) return [];
 
-    // Try parsing as JSON array
-    if (url.startsWith('[') || imageUrl.startsWith('[')) {
+    // Try parsing as JSON array first
+    if (imageUrl.trimLeft().startsWith('[')) {
       try {
-        final raw = imageUrl.startsWith('[') ? imageUrl : url;
-        final parsed = json.decode(raw);
-        if (parsed is List) {
+        final parsed = json.decode(imageUrl);
+        if (parsed is List && parsed.isNotEmpty) {
           return parsed.cast<String>();
         }
       } catch (_) {}
     }
 
-    return [url];
+    // Single data URL
+    if (imageUrl.startsWith('data:')) {
+      return [imageUrl];
+    }
+
+    // Single network URL
+    if (imageUrl.startsWith('http')) {
+      return [imageUrl];
+    }
+
+    return [];
   }
 
   @override
@@ -49,12 +55,12 @@ class ProductImage extends StatelessWidget {
       return _placeholder();
     }
 
-    // Show first image for card/thumbnail usage
+    // Show first image only for card/thumbnail
     return _buildImage(urls.first);
   }
 
   Widget _buildImage(String url) {
-    // Base64 image
+    // Base64 data URL
     if (url.startsWith('data:')) {
       try {
         final base64Str = url.split(',').last;

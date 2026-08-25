@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../models/coffee.dart';
 import '../../services/auth_service.dart';
@@ -109,7 +110,11 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     if (imageUrls.length == 1) {
-      return ProductImage(imageUrl: widget.helmet.imageUrl, width: double.infinity, height: height);
+      return SizedBox(
+        height: height,
+        width: double.infinity,
+        child: _buildSingleImage(imageUrls.first),
+      );
     }
 
     return Stack(
@@ -121,16 +126,7 @@ class _DetailScreenState extends State<DetailScreen> {
             itemCount: imageUrls.length,
             onPageChanged: (index) => setState(() => _currentImageIndex = index),
             itemBuilder: (context, index) {
-              final url = imageUrls[index];
-              return Image.network(
-                url,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorBuilder: (c, e, s) => Container(
-                  color: const Color(0xFF3A3A3D),
-                  child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.white38)),
-                ),
-              );
+              return _buildSingleImage(imageUrls[index]);
             },
           ),
         ),
@@ -155,6 +151,38 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSingleImage(String url) {
+    if (url.startsWith('data:')) {
+      try {
+        final base64Str = url.split(',').last;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(
+          Uint8List.fromList(bytes),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          errorBuilder: (c, e, s) => Container(
+            color: const Color(0xFF3A3A3D),
+            child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.white38)),
+          ),
+        );
+      } catch (e) {
+        return Container(
+          color: const Color(0xFF3A3A3D),
+          child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.white38)),
+        );
+      }
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      errorBuilder: (c, e, s) => Container(
+        color: const Color(0xFF3A3A3D),
+        child: const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.white38)),
+      ),
     );
   }
 
