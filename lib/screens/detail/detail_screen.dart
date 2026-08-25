@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
@@ -144,13 +145,21 @@ class _DetailScreenState extends State<DetailScreen> {
       children: [
         SizedBox(
           height: height ?? 300,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: imageUrls.length,
-            onPageChanged: (index) => setState(() => _currentImageIndex = index),
-            itemBuilder: (context, index) {
-              return _buildSingleImage(imageUrls[index]);
-            },
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+              },
+            ),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: imageUrls.length,
+              onPageChanged: (index) => setState(() => _currentImageIndex = index),
+              itemBuilder: (context, index) {
+                return _buildSingleImage(imageUrls[index]);
+              },
+            ),
           ),
         ),
         // Dot indicators
@@ -173,6 +182,47 @@ class _DetailScreenState extends State<DetailScreen> {
             }),
           ),
         ),
+        // Navigation arrows
+        if (imageUrls.length > 1) ...[
+          Positioned(
+            left: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  if (_currentImageIndex > 0) {
+                    _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.chevron_left, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  if (_currentImageIndex < imageUrls.length - 1) {
+                    _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: const Icon(Icons.chevron_right, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
